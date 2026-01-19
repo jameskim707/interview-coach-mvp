@@ -1,5 +1,5 @@
 import streamlit as st
-import anthropic
+import GROQ_API_KEY
 import os
 from datetime import datetime
 
@@ -92,7 +92,7 @@ api_key = None
 
 # 1. Streamlit Cloud Secrets 시도
 try:
-    if "ANTHROPIC_API_KEY" in st.secrets:
+    if "GROQ_API_KEY" in st.secrets:
         api_key = st.secrets["GROQ_API_KEY"]
         if api_key:
             api_key = api_key.strip()  # 공백 제거
@@ -101,13 +101,13 @@ except Exception as e:
 
 # 2. 환경변수 시도
 if not api_key:
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    api_key = os.environ.get("GROQ_API_KEY")
     if api_key:
         api_key = api_key.strip()
 
 # 3. API 키 검증
 if not api_key or api_key == "your_api_key_here":
-    st.error("🔑 ANTHROPIC_API_KEY가 설정되지 않았습니다!")
+    st.error("🔑 GROQ_API_KEY가 설정되지 않았습니다!")
     
     st.markdown("### 📋 설정 방법")
     
@@ -122,7 +122,7 @@ if not api_key or api_key == "your_api_key_here":
         3. 아래 형식으로 입력 (따옴표 주의!):
         
         ```toml
-        ANTHROPIC_API_KEY = "sk-ant-api03-여기에실제키"
+       GROQ_API_KEY = "sk-ant-api03-여기에실제키"
         ```
         
         4. **Save** 클릭하면 앱 자동 재시작
@@ -139,7 +139,7 @@ if not api_key or api_key == "your_api_key_here":
         
         방법 1) 환경변수 설정:
         ```bash
-        export ANTHROPIC_API_KEY="sk-ant-api03-여기에실제키"
+        export GROQ_API_KEY="sk-ant-api03-여기에실제키"
         streamlit run interview_rehearsal_complete.py
         ```
         
@@ -149,7 +149,7 @@ if not api_key or api_key == "your_api_key_here":
         cp .env.example .env
         
         # .env 파일 수정 (실제 키 입력)
-        ANTHROPIC_API_KEY=sk-ant-api03-여기에실제키
+        GROQ_API_KEY=sk-ant-api03-여기에실제키
         ```
         """)
     
@@ -329,7 +329,7 @@ def get_claude_feedback(user_message):
         )
         return response.content[0].text
     except Exception as e:
-        return f"❌ 오류가 발생했습니다: {str(e)}\n\n💡 ANTHROPIC_API_KEY를 확인해주세요."
+        return f"❌ 오류가 발생했습니다: {str(e)}\n\n💡 GROQ_API_KEY를 확인해주세요."
 
 def analyze_failure_answer(answer):
     """실패 질문 답변 분석"""
