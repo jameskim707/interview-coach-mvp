@@ -19,6 +19,29 @@ st.markdown("""
         background: linear-gradient(135deg, #1a1d29 0%, #2d3748 100%);
     }
     
+    /* 채팅 메시지 텍스트 색상 */
+    .stChatMessage {
+        color: #e2e8f0 !important;
+    }
+    
+    .stChatMessage p, .stChatMessage div, .stChatMessage span {
+        color: #e2e8f0 !important;
+    }
+    
+    /* 볼드 텍스트도 밝게 */
+    .stChatMessage strong {
+        color: #ffffff !important;
+    }
+    
+    /* 마크다운 텍스트 */
+    .stMarkdown {
+        color: #e2e8f0;
+    }
+    
+    .stMarkdown p {
+        color: #e2e8f0 !important;
+    }
+    
     /* 메인 타이틀 */
     .main-title {
         font-size: 2.2rem;
@@ -188,25 +211,27 @@ QUESTIONS = [
 # ==================== 시스템 프롬프트 ====================
 SYSTEM_PROMPT = """You are a warm, supportive interview coach conducting realistic job interview practice.
 
+🌏 CRITICAL: YOU MUST RESPOND IN KOREAN ONLY. 모든 피드백은 반드시 한국어로 작성하세요.
+
 🎯 YOUR ROLE:
 - Provide feedback on user's answer ONLY
 - Do NOT ask the next question (the app will do that)
 - Be encouraging but honest
 - Help them speak concisely (20-30 seconds is ideal)
 
-📋 FEEDBACK FORMAT (MANDATORY - ALWAYS USE THIS EXACT STRUCTURE):
+📋 FEEDBACK FORMAT (MANDATORY - ALWAYS USE THIS EXACT STRUCTURE IN KOREAN):
 
 **✅ 잘한 점:**
-[1 sentence about what worked]
+[1 sentence about what worked - IN KOREAN]
 
 **🤖 AI 티 / 모호한 표현:**
-[1 sentence pointing out generic or AI-like phrases]
+[1 sentence pointing out generic or AI-like phrases - IN KOREAN]
 
 **💡 개선 포인트:**
-[1 specific improvement suggestion]
+[1 specific improvement suggestion - IN KOREAN]
 
 **✨ 예시 답변 (당신 말투로):**
-[2-3 sentences showing better version in their style]
+[2-3 sentences showing better version in their style - IN KOREAN]
 
 ⚠️ CRITICAL RULES:
 - NEVER provide answers before they speak
@@ -214,6 +239,7 @@ SYSTEM_PROMPT = """You are a warm, supportive interview coach conducting realist
 - ALWAYS use the 4-part format above
 - Keep total feedback under 150 words
 - End with encouragement, NOT a question
+- RESPOND ONLY IN KOREAN - 한국어로만 응답하세요!
 
 🎤 20-30 SECOND COACHING:
 If answer is too long (>50 words), gently remind:
@@ -222,6 +248,8 @@ If answer is too long (>50 words), gently remind:
 
 # 5번 질문 특별 분석 프롬프트
 FAILURE_ANALYSIS_PROMPT = """Analyze this answer to the failure question.
+
+RESPOND IN ENGLISH ONLY FOR THIS ANALYSIS.
 
 Check if the answer has:
 1. Emotional words (당황, 불안, 책임감, etc.)
@@ -234,7 +262,7 @@ Respond ONLY with:
 
 Answer to analyze: {answer}
 
-Your assessment:"""
+Your assessment (NEEDS_EMOTION or OK):"""
 
 # ==================== 세션 상태 초기화 ====================
 if 'messages' not in st.session_state:
