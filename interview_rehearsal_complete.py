@@ -87,7 +87,34 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==================== Claude API 설정 ====================
-client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+# Streamlit Cloud와 로컬 환경 둘 다 지원
+try:
+    # Streamlit Cloud용 (secrets.toml)
+    api_key = st.secrets.get("ANTHROPIC_API_KEY")
+except:
+    # 로컬 환경변수용 (.env)
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+
+# API 키 검증
+if not api_key:
+    st.error("🔑 ANTHROPIC_API_KEY가 설정되지 않았습니다!")
+    st.info("""
+    **로컬 실행 시:**
+    1. `.env.example`을 `.env`로 복사
+    2. `.env` 파일에 실제 API 키 입력
+    3. `export ANTHROPIC_API_KEY="your_key"` 또는 `.env` 파일 사용
+    
+    **Streamlit Cloud 배포 시:**
+    1. 앱 페이지 우측 하단 "Manage app" 클릭
+    2. Settings → Secrets 탭
+    3. 아래 내용 입력 후 저장:
+    ```
+    ANTHROPIC_API_KEY = "your_actual_api_key_here"
+    ```
+    """)
+    st.stop()
+
+client = anthropic.Anthropic(api_key=api_key)
 
 # ==================== 질문 리스트 (라이라 기획안) ====================
 QUESTIONS = [
