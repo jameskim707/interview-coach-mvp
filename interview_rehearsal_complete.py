@@ -1,7 +1,12 @@
 import streamlit as st
-import GROQ_API_KEY
 import os
 from datetime import datetime
+
+GROQ_API_KEY = st.secrets.get("GROQ_API_KEY") or os.getenv("GROQ_API_KEY")
+
+if not GROQ_API_KEY:
+    st.error("GROQ_API_KEY가 설정되지 않았습니다.")
+    st.stop()
 
 # ==================== 페이지 설정 ====================
 st.set_page_config(
