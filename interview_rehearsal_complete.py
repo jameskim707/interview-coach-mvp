@@ -376,7 +376,7 @@ def analyze_failure_answer(answer):
 # ==================== 메인 화면 ====================
 # 헤더
 st.markdown("<div class='main-title'>🎯 AI 면접 리허설</div>", unsafe_allow_html=True)
-st.markdown("<div class='sub-title'>면접 답을 만들어주지 않습니다.<br>말하는 연습을 함께합니다.</div>", unsafe_allow_html=True)
+st.markdown("<div class='sub-title'>면접 답을 만들어주지 않습니다.<br>말하는 연습을 함께합니다.<br>면접장에서 빛날 당신을 준비시킵니다.</div>", unsafe_allow_html=True)
 
 # 사이드바
 with st.sidebar:
