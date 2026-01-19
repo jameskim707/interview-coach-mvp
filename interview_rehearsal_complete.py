@@ -1,267 +1,517 @@
-import os
 import streamlit as st
-from groq import Groq
+import anthropic
+import os
+from datetime import datetime
 
-# =========================
-# Config
-# =========================
-st.set_page_config(page_title="Interview Rehearsal MVP", page_icon="🎤", layout="centered")
+# ==================== 페이지 설정 ====================
+st.set_page_config(
+    page_title="AI 면접 리허설",
+    page_icon="💼",
+    layout="centered",
+    initial_sidebar_state="collapsed"
+)
 
-def load_groq_key() -> str | None:
-    # Streamlit Cloud: st.secrets
-    # Local: env var
-    return st.secrets.get("GROQ_API_KEY") or os.getenv("GROQ_API_KEY")
+# ==================== 스타일 (차분한 긴장감) ====================
+st.markdown("""
+<style>
+    /* 전체 배경 - 딥 네이비 */
+    .stApp {
+        background: linear-gradient(135deg, #1a1d29 0%, #2d3748 100%);
+    }
+    
+    /* 메인 타이틀 */
+    .main-title {
+        font-size: 2.2rem;
+        font-weight: 700;
+        color: #e2e8f0;
+        text-align: center;
+        margin-bottom: 0.5rem;
+        letter-spacing: -0.5px;
+    }
+    
+    /* 서브 타이틀 */
+    .sub-title {
+        font-size: 1.1rem;
+        color: #94a3b8;
+        text-align: center;
+        margin-bottom: 2rem;
+        line-height: 1.6;
+    }
+    
+    /* 질문 카드 */
+    .question-card {
+        background: rgba(255, 255, 255, 0.05);
+        border-left: 4px solid #3b82f6;
+        padding: 1.5rem;
+        border-radius: 8px;
+        margin: 1rem 0;
+        backdrop-filter: blur(10px);
+    }
+    
+    /* 압박 질문 카드 */
+    .pressure-question {
+        background: rgba(239, 68, 68, 0.1);
+        border-left: 4px solid #ef4444;
+        padding: 1.5rem;
+        border-radius: 8px;
+        margin: 1rem 0;
+    }
+    
+    /* 응원 메시지 */
+    .encouragement {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 12px;
+        text-align: center;
+        margin: 2rem 0;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+    
+    /* 버튼 스타일 */
+    .stButton>button {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        padding: 0.75rem 2rem;
+        border-radius: 8px;
+        font-weight: 600;
+        transition: all 0.3s;
+    }
+    
+    .stButton>button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+    }
+</style>
+""", unsafe_allow_html=True)
 
-GROQ_API_KEY = load_groq_key()
-if not GROQ_API_KEY:
-    st.error("🔑 GROQ_API_KEY가 설정되지 않았습니다. (Streamlit Secrets 또는 환경변수 확인)")
+# ==================== Claude API 설정 ====================
+# Streamlit Cloud와 로컬 환경 둘 다 지원
+api_key = None
+
+# 1. Streamlit Cloud Secrets 시도
+try:
+    if "ANTHROPIC_API_KEY" in st.secrets:
+        api_key = st.secrets["ANTHROPIC_API_KEY"]
+        if api_key:
+            api_key = api_key.strip()  # 공백 제거
+except Exception as e:
+    pass
+
+# 2. 환경변수 시도
+if not api_key:
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if api_key:
+        api_key = api_key.strip()
+
+# 3. API 키 검증
+if not api_key or api_key == "your_api_key_here":
+    st.error("🔑 ANTHROPIC_API_KEY가 설정되지 않았습니다!")
+    
+    st.markdown("### 📋 설정 방법")
+    
+    tab1, tab2 = st.tabs(["☁️ Streamlit Cloud", "💻 로컬 실행"])
+    
+    with tab1:
+        st.markdown("""
+        **Streamlit Cloud에서 실행 중이신가요?**
+        
+        1. 화면 우측 하단 **"Manage app"** 클릭
+        2. **Settings** → **Secrets** 탭으로 이동
+        3. 아래 형식으로 입력 (따옴표 주의!):
+        
+        ```toml
+        ANTHROPIC_API_KEY = "sk-ant-api03-여기에실제키"
+        ```
+        
+        4. **Save** 클릭하면 앱 자동 재시작
+        
+        ⚠️ 주의: 
+        - 따옴표(" ")는 반드시 포함
+        - 앞뒤 공백 없이 입력
+        - `your_api_key_here` 같은 예시값 말고 실제 키 입력
+        """)
+    
+    with tab2:
+        st.markdown("""
+        **로컬에서 실행 중이신가요?**
+        
+        방법 1) 환경변수 설정:
+        ```bash
+        export ANTHROPIC_API_KEY="sk-ant-api03-여기에실제키"
+        streamlit run interview_rehearsal_complete.py
+        ```
+        
+        방법 2) .env 파일 사용:
+        ```bash
+        # .env.example을 .env로 복사
+        cp .env.example .env
+        
+        # .env 파일 수정 (실제 키 입력)
+        ANTHROPIC_API_KEY=sk-ant-api03-여기에실제키
+        ```
+        """)
+    
+    st.info("💡 API 키는 https://console.anthropic.com/settings/keys 에서 발급받을 수 있습니다.")
     st.stop()
 
-client = Groq(api_key=GROQ_API_KEY)
+# 4. Claude 클라이언트 생성
+try:
+    # Streamlit Cloud 환경을 위한 안전한 초기화
+    client = anthropic.Anthropic(
+        api_key=api_key,
+        max_retries=2,
+        timeout=60.0
+    )
+except Exception as e:
+    st.error(f"❌ Claude API 클라이언트 생성 실패")
+    st.code(str(e))
+    st.warning("""
+    **문제 해결 방법:**
+    1. API 키가 정확한지 확인
+    2. Anthropic 계정에 크레딧이 있는지 확인
+    3. API 키가 활성화되어 있는지 확인
+    4. Manage app → 3점 메뉴 → Reboot app 시도
+    """)
+    st.stop()
 
-# =========================
-# UI Theme (simple & readable)
-# =========================
-st.markdown(
+# ==================== 질문 리스트 (라이라 기획안) ====================
+QUESTIONS = [
+    {"q": "30초로 자기소개 해볼까요?", "pressure": False},
+    {"q": "이직 사유를 솔직하게 말씀해주세요.", "pressure": False},
+    {"q": "가장 자신 있는 성과를 숫자로 말씀해주세요.", "pressure": False},
+    {"q": "그 성과에서 본인 기여는 정확히 뭐였나요?", "pressure": False},
+    {"q": "가장 힘들었던 실패 경험은? 그리고 어떻게 수습했나요?", "pressure": False, "special": "failure"},
+    {"q": "갈등 상황에서 본인 스타일은? 실제 사례로 말씀해주세요.", "pressure": False},
+    {"q": "우리 회사 지원 이유가 연봉/거리 말고 뭔가요?", "pressure": False},
+    {"q": "본인 약점 1개와 최근 3개월 개선 행동은?", "pressure": True},
+    {"q": "입사하면 30일 안에 뭘 하실 건가요?", "pressure": True},
+    {"q": "마지막으로 질문 있으신가요?", "pressure": False}
+]
+
+# ==================== 시스템 프롬프트 ====================
+SYSTEM_PROMPT = """You are a warm, supportive interview coach conducting realistic job interview practice.
+
+🎯 YOUR ROLE:
+- Provide feedback on user's answer ONLY
+- Do NOT ask the next question (the app will do that)
+- Be encouraging but honest
+- Help them speak concisely (20-30 seconds is ideal)
+
+📋 FEEDBACK FORMAT (MANDATORY - ALWAYS USE THIS EXACT STRUCTURE):
+
+**✅ 잘한 점:**
+[1 sentence about what worked]
+
+**🤖 AI 티 / 모호한 표현:**
+[1 sentence pointing out generic or AI-like phrases]
+
+**💡 개선 포인트:**
+[1 specific improvement suggestion]
+
+**✨ 예시 답변 (당신 말투로):**
+[2-3 sentences showing better version in their style]
+
+⚠️ CRITICAL RULES:
+- NEVER provide answers before they speak
+- NEVER be harsh or discouraging
+- ALWAYS use the 4-part format above
+- Keep total feedback under 150 words
+- End with encouragement, NOT a question
+
+🎤 20-30 SECOND COACHING:
+If answer is too long (>50 words), gently remind:
+"면접에서는 30초 안에 핵심만 전달하는 게 좋아요. 조금 더 간결하게 다시 해볼까요?"
+"""
+
+# 5번 질문 특별 분석 프롬프트
+FAILURE_ANALYSIS_PROMPT = """Analyze this answer to the failure question.
+
+Check if the answer has:
+1. Emotional words (당황, 불안, 책임감, etc.)
+2. Personal accountability (not blaming others)
+3. Specific feelings (not just results)
+
+Respond ONLY with:
+- "NEEDS_EMOTION" if answer is abstract/generic/lacks emotion
+- "OK" if answer includes genuine emotion and personal reflection
+
+Answer to analyze: {answer}
+
+Your assessment:"""
+
+# ==================== 세션 상태 초기화 ====================
+if 'messages' not in st.session_state:
+    st.session_state.messages = []
+if 'question_count' not in st.session_state:
+    st.session_state.question_count = 0
+if 'mode' not in st.session_state:
+    st.session_state.mode = 'free'
+if 'awaiting_emotion_answer' not in st.session_state:
+    st.session_state.awaiting_emotion_answer = False
+if 'interview_started' not in st.session_state:
+    st.session_state.interview_started = False
+
+# ==================== 헬퍼 함수 ====================
+def add_question_to_chat(question_num):
+    """질문을 채팅에 추가"""
+    if question_num >= len(QUESTIONS):
+        return False
+    
+    q_data = QUESTIONS[question_num]
+    q_text = q_data["q"]
+    is_pressure = q_data.get("pressure", False)
+    
+    if is_pressure:
+        message = f"""
+        <div class='pressure-question'>
+        <strong>🔥 압박 질문 {question_num + 1}</strong><br>
+        {q_text}
+        </div>
+        """
+    else:
+        message = f"""
+        <div class='question-card'>
+        <strong>질문 {question_num + 1}</strong><br>
+        {q_text}
+        </div>
+        """
+    
+    st.session_state.messages.append({
+        "role": "assistant", 
+        "content": message,
+        "is_question": True
+    })
+    return True
+
+def add_emotion_question():
+    """감정 추가 질문"""
+    message = """
+    <div class='question-card' style='border-left-color: #f59e0b;'>
+    <strong>💭 추가 질문</strong><br>
+    그때 결과 말고요.<br>
+    당시 당신이 실제로 느꼈던 감정은 뭐였나요?<br>
+    <small style='color: #94a3b8;'>(당황, 불안, 억울함, 책임감… 솔직하게 말해도 괜찮아요)</small>
+    </div>
     """
-<style>
-.block-container {max-width: 760px;}
-h1, h2, h3 {letter-spacing: -0.3px;}
-.small-note {color: #7a7a7a; font-size: 0.9rem;}
-.card {border: 1px solid rgba(0,0,0,0.08); border-radius: 14px; padding: 14px 14px; margin: 10px 0;}
-.badge {display:inline-block; padding: 3px 10px; border-radius: 999px; font-size: 0.85rem; border: 1px solid rgba(0,0,0,0.12); margin-right: 6px;}
-.hr {height: 1px; background: rgba(0,0,0,0.08); margin: 16px 0;}
-</style>
-""",
-    unsafe_allow_html=True,
-)
+    st.session_state.messages.append({
+        "role": "assistant",
+        "content": message,
+        "is_question": True
+    })
+    st.session_state.awaiting_emotion_answer = True
 
-# =========================
-# Interview content
-# =========================
-FREE_QUESTIONS = [
-    "30초 자기소개 해볼까요?",
-    "이직/지원 이유를 한 문장으로 먼저 말해볼래요?",
-    "가장 자신 있는 성과 1개를 숫자와 함께 말해볼래요?",
-]
+def get_claude_feedback(user_message):
+    """Claude로부터 피드백 받기"""
+    messages_for_api = []
+    
+    # 실제 대화 내용만 API에 전송 (질문 카드는 제외)
+    for msg in st.session_state.messages:
+        if not msg.get("is_question", False):
+            messages_for_api.append({
+                "role": msg["role"],
+                "content": msg["content"]
+            })
+    
+    # 현재 사용자 메시지 추가
+    messages_for_api.append({
+        "role": "user",
+        "content": user_message
+    })
+    
+    try:
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=1000,
+            system=SYSTEM_PROMPT,
+            messages=messages_for_api
+        )
+        return response.content[0].text
+    except Exception as e:
+        return f"❌ 오류가 발생했습니다: {str(e)}\n\n💡 ANTHROPIC_API_KEY를 확인해주세요."
 
-PAID_QUESTIONS = [
-    "30초 자기소개 해볼까요?",
-    "이직/지원 이유를 ‘솔직하지만 안전하게’ 말해볼래요?",
-    "가장 자신 있는 성과 1개를 숫자와 함께 말해볼래요?",
-    "그 성과에서 본인 기여가 정확히 뭐였죠? (팀 덕 말고 ‘내 행동’ 중심)",
-    "실패 경험 1개를 말해볼래요. 그리고 어떻게 수습했나요?",
-    "그때 ‘솔직한 감정’은 뭐였나요? (당황/불안/억울/책임감 등 괜찮아요)",
-    "갈등 상황에서 본인 스타일은 어떤가요? 실제 사례로.",
-    "지원한 이유가 ‘연봉/거리’ 말고 뭐예요? (회사/직무의 포인트 1개)",
-    "약점 1개와 최근 3개월 개선 행동을 말해볼래요?",
-    "입사 후 30일 안에 뭘 하겠습니까? (짧게 3개)",
-    "마지막으로 질문 있나요? (면접관에게 물을 질문 2개)",
-    "압박 질문: 방금 말한 건 누구나 할 수 있는 얘기 아닌가요? 차별점이 뭐죠?",
-]
+def analyze_failure_answer(answer):
+    """실패 질문 답변 분석"""
+    try:
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=50,
+            messages=[{
+                "role": "user",
+                "content": FAILURE_ANALYSIS_PROMPT.format(answer=answer)
+            }]
+        )
+        result = response.content[0].text.strip()
+        return "NEEDS_EMOTION" in result
+    except:
+        return False
 
-UPSELL_COPY = (
-    "여기까지는 워밍업이었어요.\n\n"
-    "당신의 말에는 이미 **진심**이 있어요. 지금은 그 진심을 **조금 더 또렷하게 만드는 단계**예요.\n\n"
-    "실전 라운드로 넘어가서(압박 질문 포함) 한 번 더 다듬어 볼까요?"
-)
+# ==================== 메인 화면 ====================
+# 헤더
+st.markdown("<div class='main-title'>🎯 AI 면접 리허설</div>", unsafe_allow_html=True)
+st.markdown("<div class='sub-title'>면접 답을 만들어주지 않습니다.<br>말하는 연습을 함께합니다.</div>", unsafe_allow_html=True)
 
-SYSTEM_PROMPT = """You are a realistic interview coach and interviewer.
-Goal: simulate a real interview and help the user practice speaking.
-Rules:
-- Ask ONE question at a time.
-- After the user answers, provide feedback in EXACTLY 4 bullet points:
-  1) What worked (one sentence)
-  2) What sounded generic/AI-like (one sentence)
-  3) One improvement (one sentence)
-  4) A rewritten example in the user's style (2-3 sentences max)
-- Warm, respectful, horizontal partner tone. No harsh scoring.
-- If answer is too long, suggest compressing to 20-30 seconds.
-- If answer is too vague, ask ONE follow-up question before moving on.
-- Do not mention policies or being an AI.
-"""
-
-def llm_feedback(question: str, answer: str, context: dict) -> str:
-    # context can include mode, job, company_type, etc.
-    user_msg = f"""Interview context:
-- Mode: {context.get('mode')}
-- Job/Role: {context.get('job')}
-- Company type: {context.get('company_type')}
-
-Question:
-{question}
-
-User answer:
-{answer}
-
-Now provide the 4-bullet feedback exactly as specified.
-"""
-    resp = client.chat.completions.create(
-        model="llama-3.1-70b-versatile",
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_msg},
-        ],
-        temperature=0.6,
-        max_tokens=420,
+# 사이드바
+with st.sidebar:
+    st.header("⚙️ 설정")
+    
+    mode_label = st.radio(
+        "모드 선택",
+        ["🆓 무료 체험 (3문항)", "💼 실전 라운드 (10문항)"],
+        index=0 if st.session_state.mode == 'free' else 1
     )
-    return resp.choices[0].message.content.strip()
+    st.session_state.mode = 'free' if '무료' in mode_label else 'paid'
+    
+    st.divider()
+    
+    # 진행 상황
+    if st.session_state.interview_started:
+        max_q = 3 if st.session_state.mode == 'free' else 10
+        progress = min(st.session_state.question_count, max_q) / max_q
+        st.progress(progress)
+        st.caption(f"진행: {min(st.session_state.question_count, max_q)}/{max_q} 문항")
+    
+    st.divider()
+    
+    if st.button("🔄 새로 시작", use_container_width=True):
+        st.session_state.messages = []
+        st.session_state.question_count = 0
+        st.session_state.awaiting_emotion_answer = False
+        st.session_state.interview_started = False
+        st.rerun()
 
-def is_vague_failure(answer: str) -> bool:
-    # super-light heuristic to trigger deeper probe
-    a = (answer or "").strip().lower()
-    if len(a) < 40:
-        return True
-    vague_markers = ["열심히", "노력", "최선을", "기억", "그냥", "대충", "많이", "좋았", "나쁘", "배웠"]
-    return any(v in a for v in vague_markers)
-
-# =========================
-# Session State
-# =========================
-if "stage" not in st.session_state:
-    st.session_state.stage = "home"  # home | run
-if "mode" not in st.session_state:
-    st.session_state.mode = "Free"   # Free | Pro
-if "job" not in st.session_state:
-    st.session_state.job = "기획/PM"
-if "company_type" not in st.session_state:
-    st.session_state.company_type = "일반"
-if "q_index" not in st.session_state:
-    st.session_state.q_index = 0
-if "history" not in st.session_state:
-    st.session_state.history = []  # list of dicts: {q, a, fb}
-if "pending_followup" not in st.session_state:
-    st.session_state.pending_followup = None  # if we ask follow-up before next
-
-# =========================
-# Home
-# =========================
-st.title("🎤 AI 면접 리허설")
-st.markdown('<div class="small-note">정답을 만들어주지 않습니다. <b>말하는 연습</b>을 함께합니다.</div>', unsafe_allow_html=True)
-st.markdown('<div class="hr"></div>', unsafe_allow_html=True)
-
-if st.session_state.stage == "home":
-    st.markdown("### 설정")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.session_state.mode = st.selectbox("모드", ["Free", "Pro"], index=0, help="Free: 3문항 / Pro: 10+문항 + 압박 질문")
+# ==================== 시작 버튼 ====================
+if not st.session_state.interview_started:
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        st.session_state.company_type = st.selectbox("회사 성향", ["보수적", "일반", "스타트업"], index=1)
-
-    st.session_state.job = st.selectbox("직무", ["기획/PM", "마케팅", "영업", "개발", "디자인", "생산/품질", "기타"], index=0)
-
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown("**진행 방식**")
-    st.write("- 질문 1개 → 답변 → 4줄 피드백 → 다음 질문")
-    st.write(" ")
-
-# =========================
-# Run session
-# =========================
-if st.session_state.stage == "run":
-    context = {
-        "mode": st.session_state.mode,
-        "job": st.session_state.job,
-        "company_type": st.session_state.company_type,
-    }
-
-    questions = FREE_QUESTIONS if st.session_state.mode == "Free" else PAID_QUESTIONS
-
-    # Free 종료 처리
-    if st.session_state.mode == "Free" and st.session_state.q_index >= len(questions):
-        st.success("✅ 무료 워밍업 종료")
-        st.markdown(f"**요약**: {len(st.session_state.history)}문항을 연습했어요.")
-        st.markdown("---")
-        st.markdown(UPSELL_COPY)
-        colA, colB = st.columns(2)
-        with colA:
-            if st.button("🔥 실전(Pro)로 계속하기", use_container_width=True):
-                st.session_state.mode = "Pro"
-                st.session_state.q_index = 0
-                st.session_state.history = []
-                st.session_state.pending_followup = None
-                st.rerun()
-        with colB:
-            if st.button("🏠 홈으로", use_container_width=True):
-                st.session_state.stage = "home"
-                st.rerun()
-        st.stop()
-
-    # Pro 종료 처리
-    if st.session_state.mode == "Pro" and st.session_state.q_index >= len(questions):
-        st.success("✅ 실전 라운드 종료")
-        st.markdown("### 최종 리포트 (간단)")
-        st.write(f"- 연습 문항: **{len(st.session_state.history)}개**")
-        st.write("- 다음 단계: 가장 약했던 2문항만 골라 3번씩 압축 연습 추천")
-        st.markdown("---")
-        if st.button("🏠 홈으로 돌아가기", use_container_width=True):
-            st.session_state.stage = "home"
+        if st.button("🎤 7분 무료 리허설 시작", use_container_width=True, type="primary"):
+            st.session_state.interview_started = True
+            add_question_to_chat(0)
+            st.session_state.question_count = 1
             st.rerun()
-        st.stop()
+    
+    st.stop()
 
-    current_q = questions[st.session_state.q_index]
+# ==================== 채팅 인터페이스 ====================
+# 채팅 히스토리 표시
+for msg in st.session_state.messages:
+    if msg.get("is_question", False):
+        # 질문 카드는 HTML로 직접 렌더링
+        st.markdown(msg["content"], unsafe_allow_html=True)
+    else:
+        # 일반 메시지
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
 
-    st.markdown(
-        f'<span class="badge">모드: {st.session_state.mode}</span>'
-        f'<span class="badge">직무: {st.session_state.job}</span>'
-        f'<span class="badge">회사: {st.session_state.company_type}</span>',
-        unsafe_allow_html=True,
-    )
-    st.markdown('<div class="hr"></div>', unsafe_allow_html=True)
+# ==================== 무료 모드 3문항 제한 ====================
+if st.session_state.mode == 'free' and st.session_state.question_count > 3:
+    st.markdown("""
+    <div class='encouragement'>
+        <h3 style='margin-top: 0;'>당신의 말에는 이미 진심이 있어요 💙</h3>
+        <p style='font-size: 1.1rem; margin: 1.5rem 0;'>
+            지금은 다만, 그 진심을 조금 더 또렷하게 만드는 단계예요.<br>
+            실전에서는 조금 더 날카로운 질문이 들어옵니다.
+        </p>
+        <p style='font-size: 0.95rem; color: #e2e8f0; margin-bottom: 1.5rem;'>
+            한 번 더 함께 연습해볼까요?
+        </p>
+        <div style='background: rgba(255,255,255,0.2); padding: 1rem; border-radius: 8px; margin-top: 1rem;'>
+            <strong>💼 실전 라운드</strong><br>
+            10문항 + 압박 질문 2개 포함<br>
+            <strong style='font-size: 1.3rem;'>₩4,900</strong>
+        </div>
+        <br>
+        <button style='background: white; color: #667eea; border: none; padding: 1rem 2rem; border-radius: 8px; font-weight: 700; cursor: pointer;'>
+            실전 라운드로 함께 가기
+        </button>
+        <p style='font-size: 0.85rem; color: #cbd5e1; margin-top: 1rem;'>
+            💡 결제 링크 준비 중입니다
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    st.stop()
 
-    st.markdown("### 질문")
-    st.markdown(f"**Q{st.session_state.q_index + 1}. {current_q}**")
-
-    answer = st.text_area("답변 (가능하면 20~30초 분량으로)", height=140, placeholder="여기에 답변을 입력하세요…")
-
-    col1, col2, col3 = st.columns([1, 1, 1])
-    with col1:
-        submit = st.button("✅ 답변 제출", use_container_width=True)
-    with col2:
-        back = st.button("↩️ 이전 질문", use_container_width=True)
-    with col3:
-        reset = st.button("🧹 세션 리셋", use_container_width=True)
-
-    if reset:
-        st.session_state.stage = "home"
-        st.session_state.q_index = 0
-        st.session_state.history = []
-        st.session_state.pending_followup = None
-        st.rerun()
-
-    if back:
-        if st.session_state.q_index > 0:
-            st.session_state.q_index -= 1
-        st.rerun()
-
-    if submit:
-        if not answer.strip():
-            st.warning("답변을 입력해주세요.")
-            st.stop()
-
-        try:
-            fb = llm_feedback(current_q, answer, context)
-        except Exception as e:
-            st.error("모델 호출 중 오류가 발생했습니다. (로그 확인 필요)")
-            st.exception(e)
-            st.stop()
-
-        st.markdown("### 피드백")
-        st.markdown(f'<div class="card">{fb.replace("\n", "<br>")}</div>', unsafe_allow_html=True)
-
-        if st.session_state.mode == "Pro" and "실패" in current_q and is_vague_failure(answer):
-            st.info("추가 질문: 그때 ‘솔직한 감정’은 뭐였나요? (당황/불안/억울/책임감 등)")
-
-        st.session_state.history.append({"q": current_q, "a": answer, "fb": fb})
-        st.session_state.q_index += 1
-        st.rerun()
-
-    if st.session_state.history:
-        st.markdown("---")
-        with st.expander("🗂️ 진행 기록 보기", expanded=False):
-            for i, item in enumerate(st.session_state.history, start=1):
-                st.markdown(f"**{i}) {item['q']}**")
-                st.write(item["a"])
-                st.markdown(f"<div class='card'>{item['fb'].replace(chr(10), '<br>')}</div>", unsafe_allow_html=True)
-                st.markdown("---")
-
+# ==================== 사용자 입력 ====================
+if prompt := st.chat_input("답변을 입력하세요... (20-30초 분량으로)"):
+    # 사용자 메시지 표시
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
+    
+    # ==================== 5번 질문 특별 처리 ====================
+    # 5번 질문에 대한 첫 답변인 경우
+    if (st.session_state.question_count == 5 and 
+        not st.session_state.awaiting_emotion_answer and
+        len([m for m in st.session_state.messages if m["role"] == "user"]) == 5):
+        
+        # 답변 분석
+        needs_emotion = analyze_failure_answer(prompt)
+        
+        if needs_emotion:
+            # 피드백 먼저 주기
+            with st.chat_message("assistant"):
+                with st.spinner("답변 분석 중..."):
+                    feedback = get_claude_feedback(prompt)
+                    st.markdown(feedback)
+                    st.session_state.messages.append({"role": "assistant", "content": feedback})
+            
+            # 감정 질문 추가
+            add_emotion_question()
+            st.rerun()
+        else:
+            # 정상 피드백
+            with st.chat_message("assistant"):
+                with st.spinner("피드백 준비 중..."):
+                    feedback = get_claude_feedback(prompt)
+                    st.markdown(feedback)
+                    st.session_state.messages.append({"role": "assistant", "content": feedback})
+            
+            # 다음 질문으로
+            if st.session_state.mode == 'paid':
+                add_question_to_chat(st.session_state.question_count)
+                st.session_state.question_count += 1
+                st.rerun()
+    
+    # 감정 추가 질문에 대한 답변인 경우
+    elif st.session_state.awaiting_emotion_answer:
+        with st.chat_message("assistant"):
+            with st.spinner("피드백 준비 중..."):
+                feedback = get_claude_feedback(prompt)
+                st.markdown(feedback)
+                st.session_state.messages.append({"role": "assistant", "content": feedback})
+        
+        st.session_state.awaiting_emotion_answer = False
+        
+        # 다음 질문으로
+        if st.session_state.mode == 'paid':
+            add_question_to_chat(st.session_state.question_count)
+            st.session_state.question_count += 1
+            st.rerun()
+    
+    # 일반 답변 처리
+    else:
+        with st.chat_message("assistant"):
+            with st.spinner("피드백 준비 중..."):
+                feedback = get_claude_feedback(prompt)
+                st.markdown(feedback)
+                st.session_state.messages.append({"role": "assistant", "content": feedback})
+        
+        # 다음 질문 추가
+        max_questions = 3 if st.session_state.mode == 'free' else 10
+        
+        if st.session_state.question_count < max_questions:
+            add_question_to_chat(st.session_state.question_count)
+            st.session_state.question_count += 1
+            st.rerun()
+        else:
+            # 종료
+            if st.session_state.mode == 'paid':
+                st.markdown("""
+                <div class='encouragement'>
+                    <h3>🎉 리허설 완료!</h3>
+                    <p>실전 면접에서 좋은 결과 있으시길 응원합니다.</p>
+                </div>
+                """, unsafe_allow_html=True)
