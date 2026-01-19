@@ -1,5 +1,5 @@
 import streamlit as st
-import anthropic
+from groq import Groq
 import os
 from datetime import datetime
 
@@ -86,14 +86,14 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ==================== Claude API 설정 ====================
+# ==================== Groq API 설정 ====================
 # Streamlit Cloud와 로컬 환경 둘 다 지원
 api_key = None
 
 # 1. Streamlit Cloud Secrets 시도
 try:
-    if "ANTHROPIC_API_KEY" in st.secrets:
-        api_key = st.secrets["ANTHROPIC_API_KEY"]
+    if "GROQ_API_KEY" in st.secrets:
+        api_key = st.secrets["GROQ_API_KEY"]
         if api_key:
             api_key = api_key.strip()  # 공백 제거
 except Exception as e:
@@ -101,13 +101,13 @@ except Exception as e:
 
 # 2. 환경변수 시도
 if not api_key:
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    api_key = os.environ.get("GROQ_API_KEY")
     if api_key:
         api_key = api_key.strip()
 
 # 3. API 키 검증
 if not api_key or api_key == "your_api_key_here":
-    st.error("🔑 ANTHROPIC_API_KEY가 설정되지 않았습니다!")
+    st.error("🔑 GROQ_API_KEY가 설정되지 않았습니다!")
     
     st.markdown("### 📋 설정 방법")
     
@@ -122,7 +122,7 @@ if not api_key or api_key == "your_api_key_here":
         3. 아래 형식으로 입력 (따옴표 주의!):
         
         ```toml
-        ANTHROPIC_API_KEY = "sk-ant-api03-여기에실제키"
+        GROQ_API_KEY = "gsk_여기에실제키"
         ```
         
         4. **Save** 클릭하면 앱 자동 재시작
@@ -139,7 +139,7 @@ if not api_key or api_key == "your_api_key_here":
         
         방법 1) 환경변수 설정:
         ```bash
-        export ANTHROPIC_API_KEY="sk-ant-api03-여기에실제키"
+        export GROQ_API_KEY="gsk_여기에실제키"
         streamlit run interview_rehearsal_complete.py
         ```
         
@@ -149,30 +149,25 @@ if not api_key or api_key == "your_api_key_here":
         cp .env.example .env
         
         # .env 파일 수정 (실제 키 입력)
-        ANTHROPIC_API_KEY=sk-ant-api03-여기에실제키
+        GROQ_API_KEY=gsk_여기에실제키
         ```
         """)
     
-    st.info("💡 API 키는 https://console.anthropic.com/settings/keys 에서 발급받을 수 있습니다.")
+    st.info("💡 API 키는 https://console.groq.com/keys 에서 무료로 발급받을 수 있습니다.")
+    st.success("✨ Groq은 **하루 14,400 요청 무료**입니다!")
     st.stop()
 
-# 4. Claude 클라이언트 생성
+# 4. Groq 클라이언트 생성
 try:
-    # Streamlit Cloud 환경을 위한 안전한 초기화
-    client = anthropic.Anthropic(
-        api_key=api_key,
-        max_retries=2,
-        timeout=60.0
-    )
+    client = Groq(api_key=api_key)
 except Exception as e:
-    st.error(f"❌ Claude API 클라이언트 생성 실패")
+    st.error(f"❌ Groq API 클라이언트 생성 실패")
     st.code(str(e))
     st.warning("""
     **문제 해결 방법:**
     1. API 키가 정확한지 확인
-    2. Anthropic 계정에 크레딧이 있는지 확인
-    3. API 키가 활성화되어 있는지 확인
-    4. Manage app → 3점 메뉴 → Reboot app 시도
+    2. https://console.groq.com/keys 에서 키 상태 확인
+    3. Manage app → 3점 메뉴 → Reboot app 시도
     """)
     st.stop()
 
@@ -303,7 +298,7 @@ def add_emotion_question():
     st.session_state.awaiting_emotion_answer = True
 
 def get_claude_feedback(user_message):
-    """Claude로부터 피드백 받기"""
+    """Groq으로부터 피드백 받기"""
     messages_for_api = []
     
     # 실제 대화 내용만 API에 전송 (질문 카드는 제외)
@@ -321,28 +316,31 @@ def get_claude_feedback(user_message):
     })
     
     try:
-        response = client.messages.create(
-            model="claude-sonnet-4-20250514",
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",  # Groq의 최고 모델
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT}
+            ] + messages_for_api,
             max_tokens=1000,
-            system=SYSTEM_PROMPT,
-            messages=messages_for_api
+            temperature=0.7
         )
-        return response.content[0].text
+        return response.choices[0].message.content
     except Exception as e:
-        return f"❌ 오류가 발생했습니다: {str(e)}\n\n💡 ANTHROPIC_API_KEY를 확인해주세요."
+        return f"❌ 오류가 발생했습니다: {str(e)}\n\n💡 GROQ_API_KEY를 확인해주세요."
 
 def analyze_failure_answer(answer):
     """실패 질문 답변 분석"""
     try:
-        response = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=50,
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
             messages=[{
                 "role": "user",
                 "content": FAILURE_ANALYSIS_PROMPT.format(answer=answer)
-            }]
+            }],
+            max_tokens=50,
+            temperature=0.3
         )
-        result = response.content[0].text.strip()
+        result = response.choices[0].message.content.strip()
         return "NEEDS_EMOTION" in result
     except:
         return False
