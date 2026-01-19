@@ -153,4 +153,4 @@ if st.session_state.stage == "home":
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown("**진행 방식**")
     st.write("- 질문 1개 → 답변 → 4줄 피드백 → 다음 질문")
-    st.wr
+    st.write
