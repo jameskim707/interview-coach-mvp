@@ -88,33 +88,81 @@ st.markdown("""
 
 # ==================== Claude API 설정 ====================
 # Streamlit Cloud와 로컬 환경 둘 다 지원
-try:
-    # Streamlit Cloud용 (secrets.toml)
-    api_key = st.secrets.get("ANTHROPIC_API_KEY")
-except:
-    # 로컬 환경변수용 (.env)
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
+api_key = None
 
-# API 키 검증
+# 1. Streamlit Cloud Secrets 시도
+try:
+    if "ANTHROPIC_API_KEY" in st.secrets:
+        api_key = st.secrets["ANTHROPIC_API_KEY"]
+        if api_key:
+            api_key = api_key.strip()  # 공백 제거
+except Exception as e:
+    pass
+
+# 2. 환경변수 시도
 if not api_key:
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if api_key:
+        api_key = api_key.strip()
+
+# 3. API 키 검증
+if not api_key or api_key == "your_api_key_here":
     st.error("🔑 ANTHROPIC_API_KEY가 설정되지 않았습니다!")
-    st.info("""
-    **로컬 실행 시:**
-    1. `.env.example`을 `.env`로 복사
-    2. `.env` 파일에 실제 API 키 입력
-    3. `export ANTHROPIC_API_KEY="your_key"` 또는 `.env` 파일 사용
     
-    **Streamlit Cloud 배포 시:**
-    1. 앱 페이지 우측 하단 "Manage app" 클릭
-    2. Settings → Secrets 탭
-    3. 아래 내용 입력 후 저장:
-    ```
-    ANTHROPIC_API_KEY = "your_actual_api_key_here"
-    ```
-    """)
+    st.markdown("### 📋 설정 방법")
+    
+    tab1, tab2 = st.tabs(["☁️ Streamlit Cloud", "💻 로컬 실행"])
+    
+    with tab1:
+        st.markdown("""
+        **Streamlit Cloud에서 실행 중이신가요?**
+        
+        1. 화면 우측 하단 **"Manage app"** 클릭
+        2. **Settings** → **Secrets** 탭으로 이동
+        3. 아래 형식으로 입력 (따옴표 주의!):
+        
+        ```toml
+        ANTHROPIC_API_KEY = "sk-ant-api03-여기에실제키"
+        ```
+        
+        4. **Save** 클릭하면 앱 자동 재시작
+        
+        ⚠️ 주의: 
+        - 따옴표(" ")는 반드시 포함
+        - 앞뒤 공백 없이 입력
+        - `your_api_key_here` 같은 예시값 말고 실제 키 입력
+        """)
+    
+    with tab2:
+        st.markdown("""
+        **로컬에서 실행 중이신가요?**
+        
+        방법 1) 환경변수 설정:
+        ```bash
+        export ANTHROPIC_API_KEY="sk-ant-api03-여기에실제키"
+        streamlit run interview_rehearsal_complete.py
+        ```
+        
+        방법 2) .env 파일 사용:
+        ```bash
+        # .env.example을 .env로 복사
+        cp .env.example .env
+        
+        # .env 파일 수정 (실제 키 입력)
+        ANTHROPIC_API_KEY=sk-ant-api03-여기에실제키
+        ```
+        """)
+    
+    st.info("💡 API 키는 https://console.anthropic.com/settings/keys 에서 발급받을 수 있습니다.")
     st.stop()
 
-client = anthropic.Anthropic(api_key=api_key)
+# 4. Claude 클라이언트 생성
+try:
+    client = anthropic.Anthropic(api_key=api_key)
+except Exception as e:
+    st.error(f"❌ Claude API 클라이언트 생성 실패: {str(e)}")
+    st.warning("API 키가 유효한지 확인해주세요.")
+    st.stop()
 
 # ==================== 질문 리스트 (라이라 기획안) ====================
 QUESTIONS = [
