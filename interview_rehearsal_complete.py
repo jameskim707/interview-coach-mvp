@@ -93,7 +93,7 @@ api_key = None
 # 1. Streamlit Cloud Secrets 시도
 try:
     if "ANTHROPIC_API_KEY" in st.secrets:
-        api_key = st.secrets["GROQ_API_KEY"]
+        api_key = st.secrets["ANTHROPIC_API_KEY"]
         if api_key:
             api_key = api_key.strip()  # 공백 제거
 except Exception as e:
