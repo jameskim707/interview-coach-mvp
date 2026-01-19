@@ -158,10 +158,22 @@ if not api_key or api_key == "your_api_key_here":
 
 # 4. Claude 클라이언트 생성
 try:
-    client = anthropic.Anthropic(api_key=api_key)
+    # Streamlit Cloud 환경을 위한 안전한 초기화
+    client = anthropic.Anthropic(
+        api_key=api_key,
+        max_retries=2,
+        timeout=60.0
+    )
 except Exception as e:
-    st.error(f"❌ Claude API 클라이언트 생성 실패: {str(e)}")
-    st.warning("API 키가 유효한지 확인해주세요.")
+    st.error(f"❌ Claude API 클라이언트 생성 실패")
+    st.code(str(e))
+    st.warning("""
+    **문제 해결 방법:**
+    1. API 키가 정확한지 확인
+    2. Anthropic 계정에 크레딧이 있는지 확인
+    3. API 키가 활성화되어 있는지 확인
+    4. Manage app → 3점 메뉴 → Reboot app 시도
+    """)
     st.stop()
 
 # ==================== 질문 리스트 (라이라 기획안) ====================
