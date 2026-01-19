@@ -154,3 +154,114 @@ if st.session_state.stage == "home":
     st.markdown("**진행 방식**")
     st.write("- 질문 1개 → 답변 → 4줄 피드백 → 다음 질문")
     st.write(" ")
+
+# =========================
+# Run session
+# =========================
+if st.session_state.stage == "run":
+    context = {
+        "mode": st.session_state.mode,
+        "job": st.session_state.job,
+        "company_type": st.session_state.company_type,
+    }
+
+    questions = FREE_QUESTIONS if st.session_state.mode == "Free" else PAID_QUESTIONS
+
+    # Free 종료 처리
+    if st.session_state.mode == "Free" and st.session_state.q_index >= len(questions):
+        st.success("✅ 무료 워밍업 종료")
+        st.markdown(f"**요약**: {len(st.session_state.history)}문항을 연습했어요.")
+        st.markdown("---")
+        st.markdown(UPSELL_COPY)
+        colA, colB = st.columns(2)
+        with colA:
+            if st.button("🔥 실전(Pro)로 계속하기", use_container_width=True):
+                st.session_state.mode = "Pro"
+                st.session_state.q_index = 0
+                st.session_state.history = []
+                st.session_state.pending_followup = None
+                st.rerun()
+        with colB:
+            if st.button("🏠 홈으로", use_container_width=True):
+                st.session_state.stage = "home"
+                st.rerun()
+        st.stop()
+
+    # Pro 종료 처리
+    if st.session_state.mode == "Pro" and st.session_state.q_index >= len(questions):
+        st.success("✅ 실전 라운드 종료")
+        st.markdown("### 최종 리포트 (간단)")
+        st.write(f"- 연습 문항: **{len(st.session_state.history)}개**")
+        st.write("- 다음 단계: 가장 약했던 2문항만 골라 3번씩 압축 연습 추천")
+        st.markdown("---")
+        if st.button("🏠 홈으로 돌아가기", use_container_width=True):
+            st.session_state.stage = "home"
+            st.rerun()
+        st.stop()
+
+    current_q = questions[st.session_state.q_index]
+
+    st.markdown(
+        f'<span class="badge">모드: {st.session_state.mode}</span>'
+        f'<span class="badge">직무: {st.session_state.job}</span>'
+        f'<span class="badge">회사: {st.session_state.company_type}</span>',
+        unsafe_allow_html=True,
+    )
+    st.markdown('<div class="hr"></div>', unsafe_allow_html=True)
+
+    st.markdown("### 질문")
+    st.markdown(f"**Q{st.session_state.q_index + 1}. {current_q}**")
+
+    answer = st.text_area("답변 (가능하면 20~30초 분량으로)", height=140, placeholder="여기에 답변을 입력하세요…")
+
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col1:
+        submit = st.button("✅ 답변 제출", use_container_width=True)
+    with col2:
+        back = st.button("↩️ 이전 질문", use_container_width=True)
+    with col3:
+        reset = st.button("🧹 세션 리셋", use_container_width=True)
+
+    if reset:
+        st.session_state.stage = "home"
+        st.session_state.q_index = 0
+        st.session_state.history = []
+        st.session_state.pending_followup = None
+        st.rerun()
+
+    if back:
+        if st.session_state.q_index > 0:
+            st.session_state.q_index -= 1
+        st.rerun()
+
+    if submit:
+        if not answer.strip():
+            st.warning("답변을 입력해주세요.")
+            st.stop()
+
+        try:
+            fb = llm_feedback(current_q, answer, context)
+        except Exception as e:
+            st.error("모델 호출 중 오류가 발생했습니다. (로그 확인 필요)")
+            st.exception(e)
+            st.stop()
+
+        st.markdown("### 피드백")
+        st.markdown(f'<div class="card">{fb.replace("\n", "<br>")}</div>', unsafe_allow_html=True)
+
+        if st.session_state.mode == "Pro" and "실패" in current_q and is_vague_failure(answer):
+            st.info("추가 질문: 그때 ‘솔직한 감정’은 뭐였나요? (당황/불안/억울/책임감 등)")
+
+        st.session_state.history.append({"q": current_q, "a": answer, "fb": fb})
+        st.session_state.q_index += 1
+        st.rerun()
+
+    if st.session_state.history:
+        st.markdown("---")
+        with st.expander("🗂️ 진행 기록 보기", expanded=False):
+            for i, item in enumerate(st.session_state.history, start=1):
+                st.markdown(f"**{i}) {item['q']}**")
+                st.write(item["a"])
+                st.markdown(f"<div class='card'>{item['fb'].replace(chr(10), '<br>')}</div>", unsafe_allow_html=True)
+                st.markdown("---")
+
